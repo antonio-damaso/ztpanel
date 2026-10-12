@@ -16,6 +16,7 @@ single-binary deployment with no external database is preferred.
 |-----------------------|--------------------------------|---------------------------------|---------------------------------|
 | Stack                 | Express + Pug + jQuery         | Next.js + Prisma                | Go + Vue 3 / PrimeVue           |
 | Deployment            | Single binary/container        | Needs a database (Postgres)     | Single binary, no database      |
+| ZeroTier daemon       | Internal (bundled in the same container) | External (separate sidecar container) | External (connects to a controller you already run) |
 | License               | GPLv3                          | GPLv3                           | MIT                             |
 | Organizations         | No                              | Yes                              | Yes                              |
 | Activity log          | No                              | Yes                              | Yes                              |
