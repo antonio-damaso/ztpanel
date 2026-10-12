@@ -32,25 +32,28 @@ body {
 .zp-mono {
   font-family: var(--zp-font-mono);
   font-size: 13px;
+  word-break: break-all;
 }
+
+/* Mobile-first: compact padding and full-width stacked actions by
+   default, roomier layout from the md breakpoint (768px) up. */
 
 .zp-page {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: 16px 16px 48px;
 }
 
 .zp-page-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .zp-page-header h1 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 650;
   margin: 0 0 4px;
   letter-spacing: -0.01em;
@@ -67,14 +70,42 @@ body {
   gap: 8px;
   flex-wrap: wrap;
 }
+.zp-actions .p-button {
+  flex: 1;
+}
 
 .zp-card {
   background: var(--zp-surface);
   border: 1px solid var(--zp-border);
   border-radius: var(--zp-radius);
   box-shadow: var(--zp-shadow);
-  padding: 20px 22px;
-  margin-bottom: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+@media (min-width: 768px) {
+  .zp-page {
+    padding: 32px 24px 64px;
+  }
+
+  .zp-page-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .zp-page-header h1 {
+    font-size: 22px;
+  }
+
+  .zp-actions .p-button {
+    flex: none;
+  }
+
+  .zp-card {
+    padding: 20px 22px;
+  }
 }
 
 .zp-card-title {
@@ -126,4 +157,42 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Inputs at 16px prevent iOS Safari's auto-zoom-on-focus; PrimeVue's
+   own classes are targeted directly since component font-size isn't
+   otherwise themeable from here. */
+.p-inputtext,
+.p-password-input,
+.p-select-label,
+.p-textarea {
+  font-size: 16px !important;
+}
+
+/* Every tap target stays at the 44px minimum on touch, even where a
+   component's default is visually smaller (e.g. PrimeVue's small
+   row-action buttons). */
+.p-button,
+.p-checkbox,
+.p-datatable-tbody > tr > td .p-button {
+  min-height: 38px;
+}
+.p-button.p-button-icon-only {
+  min-width: 44px;
+  min-height: 44px;
+}
+.p-datatable-tbody .p-button.p-button-icon-only {
+  min-width: 38px;
+  min-height: 38px;
+}
+
+.p-dialog {
+  max-width: 94vw;
+}
+
+/* DataTable already scrolls inside .zp-card's overflow-x: auto; this
+   just stops cell text from forcing the table unnecessarily wide. */
+.p-datatable-table {
+  min-width: 480px;
 }

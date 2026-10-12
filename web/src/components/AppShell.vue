@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useOrgsStore } from '../stores/orgs'
 import Menu from 'primevue/menu'
@@ -9,11 +9,22 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const orgs = useOrgsStore()
 const userMenu = ref()
+const sidebarOpen = ref(false)
 
 onMounted(() => orgs.load())
+
+// Close the mobile drawer whenever navigation happens, so tapping a
+// nav link doesn't leave it hanging open over the new page.
+watch(
+  () => route.fullPath,
+  () => {
+    sidebarOpen.value = false
+  },
+)
 
 const userMenuItems = [
   { label: 'Account', icon: 'pi pi-user', command: () => router.push({ name: 'account' }) },
@@ -49,11 +60,27 @@ async function createOrganization() {
 
 <template>
   <div class="shell">
-    <aside class="sidebar">
-      <router-link to="/" class="brand">
-        <i class="pi pi-sitemap" />
-        <span>ztpanel</span>
+    <header class="mobile-bar">
+      <button class="icon-btn" type="button" aria-label="Open menu" @click="sidebarOpen = true">
+        <i class="pi pi-bars" />
+      </button>
+      <router-link to="/" class="brand-mobile">
+        <i class="pi pi-sitemap" /><span>ztpanel</span>
       </router-link>
+    </header>
+
+    <div v-if="sidebarOpen" class="backdrop" @click="sidebarOpen = false" />
+
+    <aside class="sidebar" :class="{ open: sidebarOpen }">
+      <div class="sidebar-top">
+        <router-link to="/" class="brand">
+          <i class="pi pi-sitemap" />
+          <span>ztpanel</span>
+        </router-link>
+        <button class="icon-btn close-btn" type="button" aria-label="Close menu" @click="sidebarOpen = false">
+          <i class="pi pi-times" />
+        </button>
+      </div>
 
       <nav class="nav-section">
         <p class="nav-label">General</p>
@@ -104,7 +131,7 @@ async function createOrganization() {
       <slot />
     </main>
 
-    <Dialog v-model:visible="createOrgOpen" header="New organization" modal style="width: 420px">
+    <Dialog v-model:visible="createOrgOpen" header="New organization" modal :style="{ width: 'min(420px, 92vw)' }">
       <div class="zp-field">
         <label for="newOrgName">Name</label>
         <InputText id="newOrgName" v-model="newOrgName" fluid autofocus @keyup.enter="createOrganization" />
@@ -118,19 +145,94 @@ async function createOrganization() {
 </template>
 
 <style scoped>
+/* Mobile-first: the sidebar is an off-canvas drawer by default, and
+   only becomes a static column at the md breakpoint (768px). */
+
 .shell {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
+}
+
+.mobile-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #0f172a;
+  padding: 0 6px;
+  height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.brand-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-weight: 650;
+  font-size: 15px;
+  text-decoration: none;
+}
+.brand-mobile i {
+  color: var(--p-primary-400, #60a5fa);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 35;
 }
 
 .sidebar {
-  width: 236px;
-  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 84vw;
+  max-width: 280px;
   background: #0f172a;
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 10px 12px 16px;
+  z-index: 40;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+}
+.sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 18px 8px;
+}
+
+.close-btn {
+  display: flex;
 }
 
 .brand {
@@ -141,7 +243,6 @@ async function createOrganization() {
   font-weight: 650;
   font-size: 15px;
   text-decoration: none;
-  padding: 6px 8px 18px;
 }
 .brand i {
   color: var(--p-primary-400, #60a5fa);
@@ -178,9 +279,9 @@ async function createOrganization() {
   border: none;
   color: #64748b;
   cursor: pointer;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -193,17 +294,18 @@ async function createOrganization() {
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 8px;
+  gap: 10px;
+  padding: 11px 8px;
   border-radius: 7px;
   color: #cbd5e1;
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
+  min-height: 44px;
 }
 .nav-link i {
-  font-size: 13px;
-  width: 15px;
+  font-size: 14px;
+  width: 16px;
   text-align: center;
 }
 .nav-link:hover {
@@ -236,10 +338,11 @@ async function createOrganization() {
   background: transparent;
   border: none;
   color: #e2e8f0;
-  font-size: 13px;
-  padding: 7px 8px;
+  font-size: 13.5px;
+  padding: 10px 8px;
   border-radius: 7px;
   cursor: pointer;
+  min-height: 44px;
 }
 .user-button span {
   flex: 1;
@@ -255,5 +358,29 @@ async function createOrganization() {
 .content {
   flex: 1;
   min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .mobile-bar,
+  .backdrop,
+  .close-btn {
+    display: none;
+  }
+
+  .shell {
+    flex-direction: row;
+  }
+
+  .sidebar {
+    position: static;
+    width: 236px;
+    flex-shrink: 0;
+    transform: none;
+    transition: none;
+  }
+
+  .sidebar-top {
+    padding: 6px 8px 18px;
+  }
 }
 </style>
