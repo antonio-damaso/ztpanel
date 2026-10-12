@@ -26,10 +26,15 @@ Early / work in progress. Currently implemented:
   implemented editing for)
 - An "Advanced" panel with the network's raw controller JSON, collapsed
   by default, for debugging
-- Basic panel user management (create, delete, reset password)
-
-Planned: multi-user permissions and multi-organization support (scoping
-networks/users to an organization, the way ztnet does).
+- Panel user management (create, delete, reset password)
+- Organizations: group networks and scope who can see/manage them
+  (admin/user roles per organization), the way ztnet does -- ztpanel
+  keeps this entirely in its own store, since the ZeroTier controller
+  itself has no concept of organizations
+- Activity log: who did what, when, across networks/members/users/orgs
+- Mobile-first responsive UI (off-canvas sidebar below 768px)
+- Automated tests for every backend package and the full API surface
+  (`go test ./...`), run against a fake ZeroTier controller
 
 ## Architecture
 
@@ -38,6 +43,10 @@ networks/users to an organization, the way ztnet does).
   JSON API (`127.0.0.1:9993`, authenticated via `authtoken.secret`)
 - `internal/authsvc` -- ztpanel's own users (who may use the panel) and
   sessions; independent from ZeroTier's own identities
+- `internal/orgsvc` -- organizations: grouping networks and scoping
+  access by role, stored locally since the controller has no such
+  concept
+- `internal/auditsvc` -- the append-only activity log
 - `internal/api` -- REST handlers
 - `internal/config` -- environment-based configuration
 - `web/` -- Vue 3 + PrimeVue frontend (Vite), embedded into the Go
@@ -75,6 +84,16 @@ on first login.
 | `ZTPANEL_ZT_URL`         | `http://127.0.0.1:9993`                   | ZeroTier controller API base URL          |
 | `ZTPANEL_ZT_AUTHTOKEN`   | `/var/lib/zerotier-one/authtoken.secret`  | Path to the controller's auth token file  |
 | `ZTPANEL_DATA_DIR`       | `./data`                                  | Where ztpanel stores its own users/session key |
+
+## Testing
+
+```sh
+go test ./...                       # backend
+npm --prefix web run build          # frontend (type-checks + builds)
+```
+
+The `internal/api` tests run the full HTTP server against an in-memory
+fake of the ZeroTier controller, so they don't need a real one running.
 
 ## License
 
