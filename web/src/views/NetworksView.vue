@@ -88,8 +88,8 @@ function openNetwork(network: NetworkSummary) {
   <div class="zp-page">
     <div class="zp-page-header">
       <div>
-        <h1>Networks</h1>
-        <p class="zp-page-subtitle">Networks managed by this ZeroTier controller</p>
+        <h1>My networks</h1>
+        <p class="zp-page-subtitle">Networks not assigned to any organization</p>
       </div>
       <div class="zp-actions">
         <Button label="Add network" icon="pi pi-plus" @click="createDialogOpen = true" />

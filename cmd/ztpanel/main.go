@@ -12,6 +12,7 @@ import (
 	"github.com/antonio-damaso/ztpanel/internal/api"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/config"
+	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
 	"github.com/antonio-damaso/ztpanel/internal/ztapi"
 	"github.com/antonio-damaso/ztpanel/web"
 )
@@ -42,7 +43,12 @@ func main() {
 		log.Fatalf("could not initialise sessions: %v", err)
 	}
 
-	apiServer := api.NewServer(zt, users, sessions)
+	orgs, err := orgsvc.NewStore(cfg.OrganizationsFile())
+	if err != nil {
+		log.Fatalf("could not open organizations store: %v", err)
+	}
+
+	apiServer := api.NewServer(zt, users, sessions, orgs)
 	webServer := web.Handler()
 
 	mux := http.NewServeMux()

@@ -19,15 +19,28 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 // glance, and the controller has no bulk "list with detail" endpoint,
 // so ztpanel fetches each one. Controllers in this project's use case
 // manage a handful of networks, not thousands, so this is cheap.
+//
+// Only "personal" networks are returned here -- ones not assigned to
+// any organization. A network inside an organization is reached via
+// GET /api/organizations/{orgId}/networks instead, so it's never
+// listed twice.
 func (s *Server) handleListNetworks(w http.ResponseWriter, r *http.Request) {
 	ids, err := s.zt.ListNetworkIDs()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "could not list networks: "+err.Error())
 		return
 	}
+	assigned, err := s.orgs.AssignedNetworkIDs()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not check organization assignments")
+		return
+	}
 
 	networks := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
+		if assigned[id] {
+			continue
+		}
 		net, err := s.zt.GetNetwork(id)
 		if err != nil {
 			continue

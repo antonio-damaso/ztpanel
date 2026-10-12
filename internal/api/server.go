@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
+	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
 	"github.com/antonio-damaso/ztpanel/internal/ztapi"
 )
 
@@ -19,11 +20,12 @@ type Server struct {
 	zt       *ztapi.Client
 	users    *authsvc.UserStore
 	sessions *authsvc.SessionSigner
+	orgs     *orgsvc.Store
 	mux      *http.ServeMux
 }
 
-func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner) *Server {
-	s := &Server{zt: zt, users: users, sessions: sessions, mux: http.NewServeMux()}
+func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store) *Server {
+	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -55,6 +57,16 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/users", s.requireAuth(s.handleCreateUser))
 	s.mux.HandleFunc("POST /api/users/{name}/password", s.requireAuth(s.handleSetUserPassword))
 	s.mux.HandleFunc("DELETE /api/users/{name}", s.requireAuth(s.handleDeleteUser))
+
+	s.mux.HandleFunc("GET /api/organizations", s.requireAuth(s.handleListOrganizations))
+	s.mux.HandleFunc("POST /api/organizations", s.requireAuth(s.handleCreateOrganization))
+	s.mux.HandleFunc("GET /api/organizations/{orgId}", s.requireAuth(s.handleGetOrganization))
+	s.mux.HandleFunc("DELETE /api/organizations/{orgId}", s.requireAuth(s.handleDeleteOrganization))
+	s.mux.HandleFunc("POST /api/organizations/{orgId}/members", s.requireAuth(s.handleAddOrgMember))
+	s.mux.HandleFunc("DELETE /api/organizations/{orgId}/members/{username}", s.requireAuth(s.handleRemoveOrgMember))
+	s.mux.HandleFunc("GET /api/organizations/{orgId}/networks", s.requireAuth(s.handleListOrgNetworks))
+	s.mux.HandleFunc("POST /api/organizations/{orgId}/networks/{nwid}", s.requireAuth(s.handleAssignNetworkToOrg))
+	s.mux.HandleFunc("DELETE /api/organizations/{orgId}/networks/{nwid}", s.requireAuth(s.handleUnassignNetworkFromOrg))
 }
 
 // ---- helpers ----

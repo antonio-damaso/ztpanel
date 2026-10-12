@@ -43,6 +43,10 @@ func (c Config) SessionKeyFile() string {
 	return filepath.Join(c.DataDir, "session.key")
 }
 
+func (c Config) OrganizationsFile() string {
+	return filepath.Join(c.DataDir, "organizations.json")
+}
+
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

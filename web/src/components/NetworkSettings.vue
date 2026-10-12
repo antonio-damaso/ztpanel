@@ -103,15 +103,19 @@ function saveDns() {
 // as an ordinary editable list, like routes or IP pools.
 const newAuthToken = ref('')
 
+// The controller returns `[null]` rather than `[]` when no tokens are
+// set -- filter that out so it doesn't render as a blank row.
+const validAuthTokens = computed<string[]>(() => (props.network.authTokens || []).filter((t: unknown) => !!t))
+
 function addAuthToken() {
   if (!newAuthToken.value) return
-  const authTokens: string[] = [...(props.network.authTokens || []), newAuthToken.value]
+  const authTokens: string[] = [...validAuthTokens.value, newAuthToken.value]
   patchNetwork({ authTokens }, 'Auth token added')
   newAuthToken.value = ''
 }
 
 function removeAuthToken(token: string) {
-  const authTokens = (props.network.authTokens || []).filter((t: string) => t !== token)
+  const authTokens = validAuthTokens.value.filter((t: string) => t !== token)
   patchNetwork({ authTokens }, 'Auth token removed')
 }
 </script>
@@ -221,7 +225,7 @@ function removeAuthToken(token: string) {
         <p class="zp-page-subtitle" style="margin-top: 0">
           Tokens that let a device join this network without manual authorization.
         </p>
-        <DataTable :value="(network.authTokens || []).map((t: string) => ({ token: t }))" size="small">
+        <DataTable :value="validAuthTokens.map((t: string) => ({ token: t }))" size="small">
           <Column field="token" header="Token">
             <template #body="{ data }"><span class="zp-mono">{{ data.token }}</span></template>
           </Column>
