@@ -1,0 +1,6 @@
+.git
+.github
+data/
+web/dist
+web/node_modules
+*.md
