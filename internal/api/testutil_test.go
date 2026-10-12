@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/antonio-damaso/ztpanel/internal/apitoken"
 	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
@@ -167,6 +168,7 @@ type testEnv struct {
 	controller *fakeController
 	users      *authsvc.UserStore
 	audit      *auditsvc.Log
+	tokens     *apitoken.Store
 	httpServer *httptest.Server
 }
 
@@ -202,12 +204,16 @@ func newTestEnv(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatalf("NewLog: %v", err)
 	}
+	tokens, err := apitoken.NewStore(filepath.Join(dir, "tokens.json"))
+	if err != nil {
+		t.Fatalf("apitoken.NewStore: %v", err)
+	}
 
-	s := NewServer(zt, users, sessions, orgs, audit)
+	s := NewServer(zt, users, sessions, orgs, audit, tokens)
 	httpServer := httptest.NewServer(s)
 	t.Cleanup(httpServer.Close)
 
-	return &testEnv{server: s, controller: controller, users: users, audit: audit, httpServer: httpServer}
+	return &testEnv{server: s, controller: controller, users: users, audit: audit, tokens: tokens, httpServer: httpServer}
 }
 
 // client returns an http.Client with its own cookie jar, so each
@@ -241,7 +247,23 @@ func (e *testEnv) loginAs(t *testing.T, username, password string) *http.Client 
 	return c
 }
 
+// doBearer sends a request authenticated with an API token (as a
+// Bearer header) instead of a session cookie, the way an MCP client
+// or script would.
+func doBearer(t *testing.T, token, method, url string, body any) *http.Response {
+	t.Helper()
+	resp := doJSONWithHeaders(t, &http.Client{}, method, url, body, map[string]string{
+		"Authorization": "Bearer " + token,
+	})
+	return resp
+}
+
 func doJSON(t *testing.T, c *http.Client, method, url string, body any) *http.Response {
+	t.Helper()
+	return doJSONWithHeaders(t, c, method, url, body, nil)
+}
+
+func doJSONWithHeaders(t *testing.T, c *http.Client, method, url string, body any, headers map[string]string) *http.Response {
 	t.Helper()
 	var req *http.Request
 	var err error
@@ -259,6 +281,9 @@ func doJSON(t *testing.T, c *http.Client, method, url string, body any) *http.Re
 	}
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	resp, err := c.Do(req)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/antonio-damaso/ztpanel/internal/api"
+	"github.com/antonio-damaso/ztpanel/internal/apitoken"
 	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/config"
@@ -54,11 +55,17 @@ func main() {
 		log.Fatalf("could not open activity log: %v", err)
 	}
 
-	apiServer := api.NewServer(zt, users, sessions, orgs, audit)
+	tokens, err := apitoken.NewStore(cfg.TokensFile())
+	if err != nil {
+		log.Fatalf("could not open API token store: %v", err)
+	}
+
+	apiServer := api.NewServer(zt, users, sessions, orgs, audit, tokens)
 	webServer := web.Handler()
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiServer)
+	mux.Handle("/mcp", apiServer)
 	mux.Handle("/", webServer)
 
 	log.Printf("ztpanel listening on %s (controller: %s)", cfg.ListenAddr, cfg.ZTControllerURL)

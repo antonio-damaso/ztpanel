@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import ApiTokens from '../components/ApiTokens.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,7 +50,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="zp-page" style="max-width: 480px">
+  <div class="zp-page" style="max-width: 640px">
     <div class="zp-page-header">
       <div>
         <h1>Account</h1>
@@ -80,5 +81,7 @@ async function submit() {
 
       <Button label="Update password" :loading="saving" @click="submit" />
     </div>
+
+    <ApiTokens />
   </div>
 </template>

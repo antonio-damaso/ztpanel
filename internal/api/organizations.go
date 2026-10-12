@@ -38,20 +38,31 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 // current user belongs to it, attaching both to the request context.
 func (s *Server) requireOrgMember(next func(w http.ResponseWriter, r *http.Request, org *orgsvc.Organization, role orgsvc.Role)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		orgID := r.PathValue("orgId")
-		org, err := s.orgs.Get(orgID)
-		if err != nil {
+		org, role, err := s.orgMembership(r.PathValue("orgId"), userFromContext(r))
+		if err == orgsvc.ErrNotFound {
 			writeError(w, http.StatusNotFound, "organization not found")
 			return
 		}
-		username := userFromContext(r)
-		role, err := s.orgs.MemberRole(orgID, username)
-		if err != nil || role == "" {
+		if err != nil {
 			writeError(w, http.StatusForbidden, "not a member of this organization")
 			return
 		}
 		next(w, r, org, role)
 	}
+}
+
+// orgMembership is the HTTP-independent core of requireOrgMember,
+// reused by the MCP tools below.
+func (s *Server) orgMembership(orgID, username string) (*orgsvc.Organization, orgsvc.Role, error) {
+	org, err := s.orgs.Get(orgID)
+	if err != nil {
+		return nil, "", err
+	}
+	role, err := s.orgs.MemberRole(orgID, username)
+	if err != nil || role == "" {
+		return nil, "", orgsvc.ErrForbidden
+	}
+	return org, role, nil
 }
 
 func (s *Server) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
@@ -123,33 +134,43 @@ func (s *Server) handleRemoveOrgMember(w http.ResponseWriter, r *http.Request) {
 // organization -- the same shape as GET /api/networks, filtered.
 func (s *Server) handleListOrgNetworks(w http.ResponseWriter, r *http.Request) {
 	s.requireOrgMember(func(w http.ResponseWriter, r *http.Request, org *orgsvc.Organization, _ orgsvc.Role) {
-		belongs := map[string]bool{}
-		for _, id := range org.NetworkIDs {
-			belongs[id] = true
-		}
-
-		ids, err := s.zt.ListNetworkIDs()
+		networks, err := s.organizationNetworks(org)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "could not list networks: "+err.Error())
 			return
 		}
-
-		networks := make([]map[string]any, 0)
-		for _, id := range ids {
-			if !belongs[id] {
-				continue
-			}
-			net, err := s.zt.GetNetwork(id)
-			if err != nil {
-				continue
-			}
-			if members, err := s.zt.ListMemberIDs(id); err == nil {
-				net["memberCount"] = len(members)
-			}
-			networks = append(networks, net)
-		}
 		writeJSON(w, http.StatusOK, networks)
 	})(w, r)
+}
+
+// organizationNetworks is shared by handleListOrgNetworks and the MCP
+// list_organization_networks tool.
+func (s *Server) organizationNetworks(org *orgsvc.Organization) ([]map[string]any, error) {
+	belongs := map[string]bool{}
+	for _, id := range org.NetworkIDs {
+		belongs[id] = true
+	}
+
+	ids, err := s.zt.ListNetworkIDs()
+	if err != nil {
+		return nil, err
+	}
+
+	networks := make([]map[string]any, 0)
+	for _, id := range ids {
+		if !belongs[id] {
+			continue
+		}
+		net, err := s.zt.GetNetwork(id)
+		if err != nil {
+			continue
+		}
+		if members, err := s.zt.ListMemberIDs(id); err == nil {
+			net["memberCount"] = len(members)
+		}
+		networks = append(networks, net)
+	}
+	return networks, nil
 }
 
 // handleAssignNetworkToOrg moves a network (already created via

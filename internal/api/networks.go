@@ -25,15 +25,24 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 // GET /api/organizations/{orgId}/networks instead, so it's never
 // listed twice.
 func (s *Server) handleListNetworks(w http.ResponseWriter, r *http.Request) {
-	ids, err := s.zt.ListNetworkIDs()
+	networks, err := s.personalNetworks()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "could not list networks: "+err.Error())
 		return
 	}
+	writeJSON(w, http.StatusOK, networks)
+}
+
+// personalNetworks is shared by handleListNetworks and the MCP
+// list_networks tool.
+func (s *Server) personalNetworks() ([]map[string]any, error) {
+	ids, err := s.zt.ListNetworkIDs()
+	if err != nil {
+		return nil, err
+	}
 	assigned, err := s.orgs.AssignedNetworkIDs()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not check organization assignments")
-		return
+		return nil, err
 	}
 
 	networks := make([]map[string]any, 0, len(ids))
@@ -55,8 +64,7 @@ func (s *Server) handleListNetworks(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(networks, func(i, j int) bool {
 		return toString(networks[i]["name"]) < toString(networks[j]["name"])
 	})
-
-	writeJSON(w, http.StatusOK, networks)
+	return networks, nil
 }
 
 type createNetworkRequest struct {

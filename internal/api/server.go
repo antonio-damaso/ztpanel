@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/antonio-damaso/ztpanel/internal/apitoken"
 	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
@@ -23,11 +25,12 @@ type Server struct {
 	sessions *authsvc.SessionSigner
 	orgs     *orgsvc.Store
 	audit    *auditsvc.Log
+	tokens   *apitoken.Store
 	mux      *http.ServeMux
 }
 
-func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store, audit *auditsvc.Log) *Server {
-	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, audit: audit, mux: http.NewServeMux()}
+func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store, audit *auditsvc.Log, tokens *apitoken.Store) *Server {
+	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, audit: audit, tokens: tokens, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -70,6 +73,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/organizations/{orgId}/networks", s.requireAuth(s.handleListOrgNetworks))
 	s.mux.HandleFunc("POST /api/organizations/{orgId}/networks/{nwid}", s.requireAuth(s.handleAssignNetworkToOrg))
 	s.mux.HandleFunc("DELETE /api/organizations/{orgId}/networks/{nwid}", s.requireAuth(s.handleUnassignNetworkFromOrg))
+
+	s.mux.HandleFunc("GET /api/tokens", s.requireAuth(s.handleListTokens))
+	s.mux.HandleFunc("POST /api/tokens", s.requireAuth(s.handleCreateToken))
+	s.mux.HandleFunc("DELETE /api/tokens/{id}", s.requireAuth(s.handleRevokeToken))
+
+	s.mux.HandleFunc("POST /mcp", s.requireAuth(s.handleMCP))
 }
 
 // ---- helpers ----
@@ -97,8 +106,23 @@ type contextKey string
 
 const userContextKey contextKey = "user"
 
+// requireAuth accepts either the browser's session cookie or a
+// long-lived "Authorization: Bearer <token>" API token (internal/apitoken) --
+// the latter is how scripts, the REST API from the CLI, and the /mcp
+// endpoint authenticate without a browser.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if bearer, ok := bearerToken(r); ok {
+			username, err := s.tokens.Authenticate(bearer)
+			if err != nil {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				writeError(w, http.StatusUnauthorized, "invalid API token")
+				return
+			}
+			next(w, r.WithContext(context.WithValue(r.Context(), userContextKey, username)))
+			return
+		}
+
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "not authenticated")
@@ -112,6 +136,15 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		ctx := context.WithValue(r.Context(), userContextKey, username)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func bearerToken(r *http.Request) (string, bool) {
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if !strings.HasPrefix(auth, prefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(auth, prefix), true
 }
 
 func userFromContext(r *http.Request) string {

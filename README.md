@@ -23,6 +23,7 @@ single-binary deployment with no external database is preferred.
 | Auth token editing     | No (documented as missing)     | Yes                              | Yes                              |
 | Default admin password | Hardcoded (with a known bug)  | Set during setup                | Random, generated on first run  |
 | Mobile-friendly UI     | No                              | Partial                          | Yes (mobile-first)              |
+| LLM / MCP integration  | No                              | No                                | Yes -- `/mcp` endpoint + Bearer API tokens |
 | Docker image size*     | ~106 MiB (bundles its own `zerotier-one`) | ~251 MiB app + ~90 MiB Postgres + ~6 MiB zerotier sidecar | ~12 MiB binary, no extra containers |
 | Idle memory (RAM)*     | ~85 MiB (whole container)       | not benchmarked here             | ~10 MiB RSS, single process     |
 
@@ -65,6 +66,8 @@ Early / work in progress. Currently implemented:
   itself has no concept of organizations
 - Activity log: who did what, when, across networks/members/users/orgs
 - Mobile-first responsive UI (off-canvas sidebar below 768px)
+- API tokens and an MCP endpoint, so an LLM (Claude or otherwise) can
+  manage networks/members directly -- see [MCP / API access](#mcp--api-access)
 - Automated tests for every backend package and the full API surface
   (`go test ./...`), run against a fake ZeroTier controller
 
@@ -116,6 +119,34 @@ on first login.
 | `ZTPANEL_ZT_URL`         | `http://127.0.0.1:9993`                   | ZeroTier controller API base URL          |
 | `ZTPANEL_ZT_AUTHTOKEN`   | `/var/lib/zerotier-one/authtoken.secret`  | Path to the controller's auth token file  |
 | `ZTPANEL_DATA_DIR`       | `./data`                                  | Where ztpanel stores its own users/session key |
+
+## MCP / API access
+
+ztpanel exposes a [Model Context Protocol](https://modelcontextprotocol.io/)
+endpoint at `POST /mcp`, so an LLM can list/create/update/delete
+networks and members directly. Organizations and the activity log are
+exposed read-only; membership and org structure stay a web-UI-only
+action.
+
+Authentication is a long-lived Bearer API token, not OAuth: ztpanel is
+a single, self-hosted binary with no authorization-server
+infrastructure of its own, so a static token -- generated once in
+**Account -> API tokens** -- is the simpler fit. The REST API under
+`/api/*` accepts the same token (as `Authorization: Bearer <token>`),
+so it also works for plain scripts, not just MCP clients.
+
+With [Claude Code](https://claude.com/claude-code):
+
+```sh
+claude mcp add --transport http ztpanel https://your-ztpanel-host/mcp \
+  --header "Authorization: Bearer ztpanel_xxxxx"
+```
+
+Note this does **not** work with Claude.ai/Claude Desktop's
+"Connectors" UI, which requires a remote MCP server to be an OAuth
+authorization server -- ztpanel isn't one. It works with any MCP
+client that can send a static Bearer header (Claude Code, most
+self-hosted/CLI clients).
 
 ## Testing
 

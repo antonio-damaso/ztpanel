@@ -9,12 +9,20 @@ import (
 // with its live peer status (online/relay/offline, latency) so the
 // UI can render connection state without a second round trip per row.
 func (s *Server) handleListMembers(w http.ResponseWriter, r *http.Request) {
-	networkID := r.PathValue("id")
-
-	memberIDs, err := s.zt.ListMemberIDs(networkID)
+	members, err := s.networkMembers(r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "could not list members: "+err.Error())
 		return
+	}
+	writeJSON(w, http.StatusOK, members)
+}
+
+// networkMembers is shared by handleListMembers and the MCP
+// list_members tool.
+func (s *Server) networkMembers(networkID string) ([]map[string]any, error) {
+	memberIDs, err := s.zt.ListMemberIDs(networkID)
+	if err != nil {
+		return nil, err
 	}
 
 	peersByAddr := s.peersByAddress()
@@ -34,8 +42,7 @@ func (s *Server) handleListMembers(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(members, func(i, j int) bool {
 		return toString(members[i]["address"]) < toString(members[j]["address"])
 	})
-
-	writeJSON(w, http.StatusOK, members)
+	return members, nil
 }
 
 func (s *Server) peersByAddress() map[string]map[string]any {
