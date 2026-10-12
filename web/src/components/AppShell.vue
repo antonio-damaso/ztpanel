@@ -360,6 +360,14 @@ async function createOrganization() {
   min-width: 0;
 }
 
+.icon-btn:focus-visible,
+.nav-link:focus-visible,
+.nav-add:focus-visible,
+.user-button:focus-visible {
+  outline: 2px solid var(--p-primary-400, #60a5fa);
+  outline-offset: 2px;
+}
+
 @media (min-width: 768px) {
   .mobile-bar,
   .backdrop,

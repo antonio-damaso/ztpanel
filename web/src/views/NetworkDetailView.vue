@@ -114,8 +114,8 @@ function confirmDeleteNetwork() {
           </div>
           <div v-else class="zp-row">
             <InputText v-model="nameDraft" size="small" @keyup.enter="saveName" />
-            <Button icon="pi pi-check" :loading="savingName" rounded size="small" @click="saveName" />
-            <Button icon="pi pi-times" text rounded size="small" @click="editingName = false" />
+            <Button icon="pi pi-check" :loading="savingName" rounded size="small" aria-label="Save name" @click="saveName" />
+            <Button icon="pi pi-times" text rounded size="small" aria-label="Cancel rename" @click="editingName = false" />
           </div>
           <p class="zp-page-subtitle zp-mono">{{ network.nwid }}</p>
         </div>

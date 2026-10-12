@@ -132,7 +132,7 @@ function removeAuthToken(token: string) {
           </Column>
           <Column header="" style="width: 44px">
             <template #body="{ data }">
-              <Button icon="pi pi-trash" severity="danger" text rounded @click="removeRoute(data)" />
+              <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Remove route" @click="removeRoute(data)" />
             </template>
           </Column>
           <template #empty>
@@ -161,7 +161,7 @@ function removeAuthToken(token: string) {
           <Column field="ipRangeEnd" header="Range end" />
           <Column header="" style="width: 44px">
             <template #body="{ data }">
-              <Button icon="pi pi-trash" severity="danger" text rounded @click="removePool(data)" />
+              <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Remove IP pool" @click="removePool(data)" />
             </template>
           </Column>
           <template #empty>
@@ -231,7 +231,7 @@ function removeAuthToken(token: string) {
           </Column>
           <Column header="" style="width: 44px">
             <template #body="{ data }">
-              <Button icon="pi pi-trash" severity="danger" text rounded @click="removeAuthToken(data.token)" />
+              <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Remove auth token" @click="removeAuthToken(data.token)" />
             </template>
           </Column>
           <template #empty>
