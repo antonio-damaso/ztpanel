@@ -9,6 +9,7 @@ const router = createRouter({
     { path: '/networks/:id', name: 'network-detail', component: () => import('../views/NetworkDetailView.vue'), props: true },
     { path: '/organizations/:id', name: 'organization', component: () => import('../views/OrganizationView.vue'), props: true },
     { path: '/users', name: 'users', component: () => import('../views/UsersView.vue') },
+    { path: '/activity', name: 'activity', component: () => import('../views/ActivityView.vue') },
     { path: '/account', name: 'account', component: () => import('../views/AccountView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

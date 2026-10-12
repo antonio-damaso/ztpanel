@@ -76,6 +76,7 @@ func (s *Server) handleUpdateMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "could not update member: "+err.Error())
 		return
 	}
+	s.audit.Record(userFromContext(r), "updated member", addr+" on "+networkID, changedFieldNames(fields))
 	writeJSON(w, http.StatusOK, member)
 }
 
@@ -85,5 +86,6 @@ func (s *Server) handleDeleteMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "could not delete member: "+err.Error())
 		return
 	}
+	s.audit.Record(userFromContext(r), "removed member", addr+" from "+networkID, "")
 	writeJSON(w, http.StatusOK, nil)
 }

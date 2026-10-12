@@ -117,6 +117,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not create user")
 		return
 	}
+	s.audit.Record(userFromContext(r), "created panel user", req.Name, "")
 	writeJSON(w, http.StatusCreated, nil)
 }
 
@@ -140,6 +141,7 @@ func (s *Server) handleSetUserPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
+	s.audit.Record(userFromContext(r), "reset password", name, "")
 	writeJSON(w, http.StatusOK, nil)
 }
 
@@ -153,5 +155,6 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
+	s.audit.Record(userFromContext(r), "deleted panel user", name, "")
 	writeJSON(w, http.StatusOK, nil)
 }

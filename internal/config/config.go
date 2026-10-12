@@ -47,6 +47,10 @@ func (c Config) OrganizationsFile() string {
 	return filepath.Join(c.DataDir, "organizations.json")
 }
 
+func (c Config) ActivityLogFile() string {
+	return filepath.Join(c.DataDir, "activity.jsonl")
+}
+
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

@@ -85,6 +85,9 @@ async function createOrganization() {
         <router-link to="/users" class="nav-link">
           <i class="pi pi-users" /><span>Panel users</span>
         </router-link>
+        <router-link to="/activity" class="nav-link">
+          <i class="pi pi-history" /><span>Activity</span>
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">

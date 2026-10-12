@@ -30,6 +30,7 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, "could not create organization")
 		return
 	}
+	s.audit.Record(userFromContext(r), "created organization", org.Name, "")
 	writeJSON(w, http.StatusCreated, org)
 }
 
@@ -69,6 +70,7 @@ func (s *Server) handleDeleteOrganization(w http.ResponseWriter, r *http.Request
 			writeError(w, http.StatusInternalServerError, "could not delete organization")
 			return
 		}
+		s.audit.Record(userFromContext(r), "deleted organization", org.Name, "")
 		writeJSON(w, http.StatusOK, nil)
 	})(w, r)
 }
@@ -96,6 +98,7 @@ func (s *Server) handleAddOrgMember(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "could not add member: "+err.Error())
 			return
 		}
+		s.audit.Record(userFromContext(r), "added org member", req.Username+" to "+org.Name, string(req.Role))
 		writeJSON(w, http.StatusOK, nil)
 	})(w, r)
 }
@@ -111,6 +114,7 @@ func (s *Server) handleRemoveOrgMember(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "member not found")
 			return
 		}
+		s.audit.Record(userFromContext(r), "removed org member", username+" from "+org.Name, "")
 		writeJSON(w, http.StatusOK, nil)
 	})(w, r)
 }
@@ -165,6 +169,7 @@ func (s *Server) handleAssignNetworkToOrg(w http.ResponseWriter, r *http.Request
 			writeError(w, http.StatusInternalServerError, "could not assign network")
 			return
 		}
+		s.audit.Record(userFromContext(r), "assigned network to organization", networkID+" to "+org.Name, "")
 		writeJSON(w, http.StatusOK, nil)
 	})(w, r)
 }
@@ -180,6 +185,7 @@ func (s *Server) handleUnassignNetworkFromOrg(w http.ResponseWriter, r *http.Req
 			writeError(w, http.StatusInternalServerError, "could not unassign network")
 			return
 		}
+		s.audit.Record(userFromContext(r), "removed network from organization", networkID+" from "+org.Name, "")
 		writeJSON(w, http.StatusOK, nil)
 	})(w, r)
 }

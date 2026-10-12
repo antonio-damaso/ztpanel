@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/antonio-damaso/ztpanel/internal/api"
+	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/config"
 	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
@@ -48,7 +49,12 @@ func main() {
 		log.Fatalf("could not open organizations store: %v", err)
 	}
 
-	apiServer := api.NewServer(zt, users, sessions, orgs)
+	audit, err := auditsvc.NewLog(cfg.ActivityLogFile())
+	if err != nil {
+		log.Fatalf("could not open activity log: %v", err)
+	}
+
+	apiServer := api.NewServer(zt, users, sessions, orgs, audit)
 	webServer := web.Handler()
 
 	mux := http.NewServeMux()

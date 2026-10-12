@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
 	"github.com/antonio-damaso/ztpanel/internal/ztapi"
@@ -21,11 +22,12 @@ type Server struct {
 	users    *authsvc.UserStore
 	sessions *authsvc.SessionSigner
 	orgs     *orgsvc.Store
+	audit    *auditsvc.Log
 	mux      *http.ServeMux
 }
 
-func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store) *Server {
-	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, mux: http.NewServeMux()}
+func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store, audit *auditsvc.Log) *Server {
+	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, audit: audit, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -41,6 +43,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/me/password", s.requireAuth(s.handleChangeOwnPassword))
 
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleStatus))
+	s.mux.HandleFunc("GET /api/activity", s.requireAuth(s.handleActivity))
 
 	s.mux.HandleFunc("GET /api/networks", s.requireAuth(s.handleListNetworks))
 	s.mux.HandleFunc("POST /api/networks", s.requireAuth(s.handleCreateNetwork))

@@ -74,6 +74,7 @@ func (s *Server) handleCreateNetwork(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "could not create network: "+err.Error())
 		return
 	}
+	s.audit.Record(userFromContext(r), "created network", toString(net["name"])+" ("+toString(net["nwid"])+")", "")
 	writeJSON(w, http.StatusCreated, net)
 }
 
@@ -104,16 +105,38 @@ func (s *Server) handleUpdateNetwork(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "could not update network: "+err.Error())
 		return
 	}
+	s.audit.Record(userFromContext(r), "updated network", toString(net["name"])+" ("+id+")", changedFieldNames(fields))
 	writeJSON(w, http.StatusOK, net)
 }
 
 func (s *Server) handleDeleteNetwork(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	name := id
+	if net, err := s.zt.GetNetwork(id); err == nil {
+		name = toString(net["name"]) + " (" + id + ")"
+	}
 	if err := s.zt.DeleteNetwork(id); err != nil {
 		writeError(w, http.StatusBadGateway, "could not delete network: "+err.Error())
 		return
 	}
+	s.audit.Record(userFromContext(r), "deleted network", name, "")
 	writeJSON(w, http.StatusOK, nil)
+}
+
+func changedFieldNames(fields map[string]any) string {
+	names := make([]string, 0, len(fields))
+	for k := range fields {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	out := ""
+	for i, n := range names {
+		if i > 0 {
+			out += ", "
+		}
+		out += n
+	}
+	return out
 }
 
 func toString(v any) string {
