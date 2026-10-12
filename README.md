@@ -7,8 +7,25 @@ frontend) talking to the controller's local JSON API.
 Built as a from-scratch alternative to
 [ztncui](https://github.com/key-networks/ztncui), aiming for a cleaner,
 less cluttered UI, and to
-[`ztnet`](https://github.com/tinola/ztnet) (Next.js/Prisma) when a
+[`ztnet`](https://github.com/sinamics/ztnet) (Next.js/Prisma) when a
 single-binary deployment with no external database is preferred.
+
+## Comparison
+
+|                       | ztncui                        | ztnet                          | ztpanel                        |
+|-----------------------|--------------------------------|---------------------------------|---------------------------------|
+| Stack                 | Express + Pug + jQuery         | Next.js + Prisma                | Go + Vue 3 / PrimeVue           |
+| Deployment            | Single binary/container        | Needs a database (Postgres)     | Single binary, no database      |
+| License               | GPLv3                          | GPLv3                           | MIT                             |
+| Organizations         | No                              | Yes                              | Yes                              |
+| Activity log          | No                              | Yes                              | Yes                              |
+| Auth token editing     | No (documented as missing)     | Yes                              | Yes                              |
+| Default admin password | Hardcoded (with a known bug)  | Set during setup                | Random, generated on first run  |
+| Mobile-friendly UI     | No                              | Partial                          | Yes (mobile-first)              |
+
+ztnet has the most mature feature set and a larger community; ztpanel
+trades some of that maturity for a lighter deployment footprint (no
+external database) and a from-scratch, less cluttered UI.
 
 ## Status
 
