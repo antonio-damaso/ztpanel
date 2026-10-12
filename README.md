@@ -22,10 +22,21 @@ single-binary deployment with no external database is preferred.
 | Auth token editing     | No (documented as missing)     | Yes                              | Yes                              |
 | Default admin password | Hardcoded (with a known bug)  | Set during setup                | Random, generated on first run  |
 | Mobile-friendly UI     | No                              | Partial                          | Yes (mobile-first)              |
+| Docker image size*     | ~106 MiB (bundles its own `zerotier-one`) | ~251 MiB app + ~90 MiB Postgres + ~6 MiB zerotier sidecar | ~12 MiB binary, no extra containers |
+| Idle memory (RAM)*     | not benchmarked here            | not benchmarked here             | ~10 MiB RSS, single process     |
 
 ztnet has the most mature feature set and a larger community; ztpanel
 trades some of that maturity for a lighter deployment footprint (no
 external database) and a from-scratch, less cluttered UI.
+
+\* Docker image sizes are the published compressed sizes from Docker
+Hub (`keynetworks/ztncui:latest`, `sinamics/ztnet:latest`,
+`postgres:15.2-alpine`, `zyclonite/zerotier:1.14.2`), checked when this
+table was written -- they'll drift over time. The ztpanel binary size
+and idle RSS were measured directly on this build; ztncui/ztnet were
+not run in this environment, so no RAM number is given for them --
+expect both to use noticeably more, since each runs a full Node.js or
+Express server process (ztnet also runs a separate Postgres server).
 
 ## Status
 
