@@ -145,7 +145,10 @@ func (s *UserStore) SetPassword(name, password string, mustChangePassword bool) 
 // Authenticate checks a username/password pair and returns the user
 // on success. It does not distinguish "no such user" from "wrong
 // password" in the returned error, to avoid leaking which usernames
-// exist.
+// exist -- and, for the same reason, always runs a bcrypt comparison
+// even when the user doesn't exist, so a missing user doesn't return
+// measurably faster than a wrong password and let a timing side
+// channel do the same job.
 func (s *UserStore) Authenticate(name, password string) (User, error) {
 	s.mu.Lock()
 	users, err := s.load()
@@ -154,15 +157,21 @@ func (s *UserStore) Authenticate(name, password string) (User, error) {
 		return User{}, err
 	}
 	u, exists := users[name]
+	hash := u.PasswordHash
 	if !exists {
-		return User{}, ErrInvalidCredentials
+		hash = dummyPasswordHash
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil || !exists {
 		return User{}, ErrInvalidCredentials
 	}
 	u.PasswordHash = ""
 	return u, nil
 }
+
+// dummyPasswordHash is a valid bcrypt hash of an unused, unguessable
+// value -- compared against on every lookup of a nonexistent user,
+// purely so that path costs the same bcrypt work as a real one.
+const dummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 func hashPassword(password string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

@@ -3,6 +3,7 @@ package authsvc
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func newTestUserStore(t *testing.T) *UserStore {
@@ -37,6 +38,32 @@ func TestUserStoreCreateAndAuthenticate(t *testing.T) {
 	}
 	if user.PasswordHash != "" {
 		t.Errorf("Authenticate leaked PasswordHash: %q", user.PasswordHash)
+	}
+}
+
+func TestUserStoreAuthenticateUnknownUserCostsRealBcryptWork(t *testing.T) {
+	s := newTestUserStore(t)
+	if err := s.Create("alice", "correct-password", false); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	measure := func(name string) time.Duration {
+		start := time.Now()
+		if _, err := s.Authenticate(name, "whatever-password"); err != ErrInvalidCredentials {
+			t.Fatalf("Authenticate(%q): got %v, want ErrInvalidCredentials", name, err)
+		}
+		return time.Since(start)
+	}
+
+	// A wrong password for a real user and a lookup of a user that
+	// doesn't exist at all must do comparable bcrypt work, so neither
+	// path is a faster way to probe for valid usernames.
+	wrongPassword := measure("alice")
+	unknownUser := measure("nobody")
+
+	ratio := float64(unknownUser) / float64(wrongPassword)
+	if ratio < 0.5 || ratio > 2 {
+		t.Errorf("unknown-user lookup took %v, wrong-password took %v (ratio %.2f) -- want comparable bcrypt cost", unknownUser, wrongPassword, ratio)
 	}
 }
 

@@ -20,6 +20,41 @@ func TestLoginWrongPassword(t *testing.T) {
 	}
 }
 
+func TestLoginCookieIsSecureOnlyWhenTheRequestWasHTTPS(t *testing.T) {
+	env := newTestEnv(t)
+	if err := env.users.Create("alice", "correct-password", false); err != nil {
+		t.Fatalf("Create user: %v", err)
+	}
+
+	plainResp := doJSON(t, env.client(t), "POST", env.url("/api/login"), map[string]any{
+		"username": "alice", "password": "correct-password",
+	})
+	defer plainResp.Body.Close()
+	for _, c := range plainResp.Cookies() {
+		if c.Name == sessionCookieName && c.Secure {
+			t.Errorf("session cookie is Secure on a plain HTTP request/response")
+		}
+	}
+
+	httpsResp := doJSONWithHeaders(t, &http.Client{}, "POST", env.url("/api/login"),
+		map[string]any{"username": "alice", "password": "correct-password"},
+		map[string]string{"X-Forwarded-Proto": "https"},
+	)
+	defer httpsResp.Body.Close()
+	found := false
+	for _, c := range httpsResp.Cookies() {
+		if c.Name == sessionCookieName {
+			found = true
+			if !c.Secure {
+				t.Errorf("session cookie is not Secure when X-Forwarded-Proto: https")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no session cookie returned")
+	}
+}
+
 func TestLoginIsRateLimitedPerIP(t *testing.T) {
 	env := newTestEnv(t)
 	if err := env.users.Create("alice", "correct-password", false); err != nil {

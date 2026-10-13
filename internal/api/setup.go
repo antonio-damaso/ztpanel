@@ -66,6 +66,6 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit.Record(req.Username, "completed first-run setup", req.Username, "")
 
-	s.issueSessionCookie(w, req.Username)
+	s.issueSessionCookie(w, r, req.Username)
 	writeJSON(w, http.StatusCreated, map[string]any{"username": req.Username})
 }

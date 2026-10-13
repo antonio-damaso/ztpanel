@@ -58,8 +58,10 @@ alongside a separate Postgres server.
 
 Early / work in progress. Currently implemented:
 
-- Login, sessions (stateless signed cookies), per-user password change,
-  per-IP rate limiting on `/api/login` and `/api/setup`
+- Login, sessions (stateless signed cookies, `Secure` behind a TLS
+  reverse proxy), per-user password change, per-IP rate limiting on
+  `/api/login` and `/api/setup`, constant-time password checks
+  (no username-enumeration timing side channel)
 - First-run setup page: choose the admin username/password yourself in
   the browser (and see whether the ZeroTier controller is reachable)
   instead of digging a generated password out of the container logs --
@@ -154,6 +156,12 @@ ZeroTier controller) and you're logged straight in.
 | `ZTPANEL_ZT_URL`         | `http://127.0.0.1:9993`                   | ZeroTier controller API base URL          |
 | `ZTPANEL_ZT_AUTHTOKEN`   | `/var/lib/zerotier-one/authtoken.secret`  | Path to the controller's auth token file  |
 | `ZTPANEL_DATA_DIR`       | `./data`                                  | Where ztpanel stores its own users/session key |
+
+ztpanel itself speaks plain HTTP only -- put a TLS-terminating reverse
+proxy (Caddy, nginx, Traefik...) in front of it for any deployment
+reachable outside `localhost`. The session cookie is marked `Secure`
+whenever the proxy forwards `X-Forwarded-Proto: https`, so make sure
+your proxy sets that header.
 
 ## MCP / API access
 

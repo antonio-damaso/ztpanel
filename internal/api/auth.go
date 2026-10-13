@@ -25,7 +25,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.issueSessionCookie(w, user.Name)
+	s.issueSessionCookie(w, r, user.Name)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"username":           user.Name,
 		"mustChangePassword": user.MustChangePassword,
@@ -34,16 +34,31 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 // issueSessionCookie is shared by handleLogin and handleSetup -- both
 // end with the caller holding a valid session.
-func (s *Server) issueSessionCookie(w http.ResponseWriter, username string) {
+func (s *Server) issueSessionCookie(w http.ResponseWriter, r *http.Request, username string) {
 	token, expires := s.sessions.Issue(username)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isRequestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expires,
 	})
+}
+
+// isRequestSecure reports whether the original client request arrived
+// over HTTPS, either directly (r.TLS) or, since ztpanel is normally
+// deployed behind a TLS-terminating reverse proxy that forwards plain
+// HTTP, via the proxy's own X-Forwarded-Proto header. A forged header
+// can only make the cookie Secure when it shouldn't be -- browsers
+// refuse to accept a Secure cookie from a response not itself served
+// over HTTPS -- never the other way around.
+func isRequestSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
