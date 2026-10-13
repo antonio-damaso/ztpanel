@@ -20,6 +20,33 @@ func TestLoginWrongPassword(t *testing.T) {
 	}
 }
 
+func TestLoginIsRateLimitedPerIP(t *testing.T) {
+	env := newTestEnv(t)
+	if err := env.users.Create("alice", "correct-password", false); err != nil {
+		t.Fatalf("Create user: %v", err)
+	}
+	c := env.client(t)
+
+	for i := 0; i < loginRateLimit; i++ {
+		resp := doJSON(t, c, "POST", env.url("/api/login"), map[string]any{
+			"username": "alice", "password": "wrong-password",
+		})
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: status %d, want 401", i, resp.StatusCode)
+		}
+	}
+
+	// The limit is now exhausted, even for the correct password.
+	resp := doJSON(t, c, "POST", env.url("/api/login"), map[string]any{
+		"username": "alice", "password": "correct-password",
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status after exhausting the limit = %d, want 429", resp.StatusCode)
+	}
+}
+
 func TestLoginSuccessSetsCookieAndReturnsFlag(t *testing.T) {
 	env := newTestEnv(t)
 	if err := env.users.Create("alice", "correct-password", true); err != nil {

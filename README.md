@@ -58,7 +58,8 @@ alongside a separate Postgres server.
 
 Early / work in progress. Currently implemented:
 
-- Login, sessions (stateless signed cookies), per-user password change
+- Login, sessions (stateless signed cookies), per-user password change,
+  per-IP rate limiting on `/api/login` and `/api/setup`
 - First-run setup page: choose the admin username/password yourself in
   the browser (and see whether the ZeroTier controller is reachable)
   instead of digging a generated password out of the container logs --
@@ -105,6 +106,26 @@ Early / work in progress. Currently implemented:
 Requires a `zerotier-one` controller already running on the host (or
 reachable over the network) -- ztpanel does not run its own ZeroTier
 daemon.
+
+### Docker
+
+A prebuilt image is published to GHCR on every push to `main` and on
+every `v*` tag:
+
+```sh
+docker run -d \
+  -p 8787:8787 \
+  -v /var/lib/zerotier-one/authtoken.secret:/var/lib/zerotier-one/authtoken.secret:ro \
+  -v ztpanel-data:/data \
+  --network host \
+  ghcr.io/antonio-damaso/ztpanel:latest
+```
+
+`--network host` is the simplest way to let the container reach the
+controller at `127.0.0.1:9993`; alternatively set `ZTPANEL_ZT_URL` to
+wherever the controller is actually reachable from the container.
+
+### From source
 
 ```sh
 # 1. Build the frontend

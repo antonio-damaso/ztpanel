@@ -86,6 +86,25 @@ func TestSetupRejectsShortPasswordOrEmptyUsername(t *testing.T) {
 	}
 }
 
+func TestSetupIsRateLimitedPerIP(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.client(t)
+
+	for i := 0; i < setupRateLimit; i++ {
+		resp := doJSON(t, c, "POST", env.url("/api/setup"), map[string]any{"username": "alice", "password": "short"})
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("attempt %d: status %d, want 400", i, resp.StatusCode)
+		}
+	}
+
+	resp := doJSON(t, c, "POST", env.url("/api/setup"), map[string]any{"username": "alice", "password": "alice-password1"})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("status after exhausting the limit = %d, want 429", resp.StatusCode)
+	}
+}
+
 func TestSetupRefusesOnceConfigured(t *testing.T) {
 	env := newTestEnv(t)
 	c := env.client(t)

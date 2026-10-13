@@ -7,30 +7,48 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/antonio-damaso/ztpanel/internal/apitoken"
 	"github.com/antonio-damaso/ztpanel/internal/auditsvc"
 	"github.com/antonio-damaso/ztpanel/internal/authsvc"
 	"github.com/antonio-damaso/ztpanel/internal/orgsvc"
+	"github.com/antonio-damaso/ztpanel/internal/ratelimit"
 	"github.com/antonio-damaso/ztpanel/internal/ztapi"
 )
 
 const sessionCookieName = "ztpanel_session"
 
+// loginRateLimit and setupRateLimit bound brute-force attempts against
+// the two unauthenticated credential-checking endpoints.
+const (
+	loginRateLimit  = 10
+	setupRateLimit  = 10
+	rateLimitWindow = time.Minute
+)
+
 type Server struct {
-	zt       *ztapi.Client
-	users    *authsvc.UserStore
-	sessions *authsvc.SessionSigner
-	orgs     *orgsvc.Store
-	audit    *auditsvc.Log
-	tokens   *apitoken.Store
-	mux      *http.ServeMux
+	zt           *ztapi.Client
+	users        *authsvc.UserStore
+	sessions     *authsvc.SessionSigner
+	orgs         *orgsvc.Store
+	audit        *auditsvc.Log
+	tokens       *apitoken.Store
+	loginLimiter *ratelimit.Limiter
+	setupLimiter *ratelimit.Limiter
+	mux          *http.ServeMux
 }
 
 func NewServer(zt *ztapi.Client, users *authsvc.UserStore, sessions *authsvc.SessionSigner, orgs *orgsvc.Store, audit *auditsvc.Log, tokens *apitoken.Store) *Server {
-	s := &Server{zt: zt, users: users, sessions: sessions, orgs: orgs, audit: audit, tokens: tokens, mux: http.NewServeMux()}
+	s := &Server{
+		zt: zt, users: users, sessions: sessions, orgs: orgs, audit: audit, tokens: tokens,
+		loginLimiter: ratelimit.New(loginRateLimit, rateLimitWindow),
+		setupLimiter: ratelimit.New(setupRateLimit, rateLimitWindow),
+		mux:          http.NewServeMux(),
+	}
 	s.routes()
 	return s
 }
@@ -41,9 +59,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/setup/status", s.handleSetupStatus)
-	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
+	s.mux.HandleFunc("POST /api/setup", rateLimited(s.setupLimiter, s.handleSetup))
 
-	s.mux.HandleFunc("POST /api/login", s.handleLogin)
+	s.mux.HandleFunc("POST /api/login", rateLimited(s.loginLimiter, s.handleLogin))
 	s.mux.HandleFunc("POST /api/logout", s.requireAuth(s.handleLogout))
 	s.mux.HandleFunc("GET /api/me", s.requireAuth(s.handleMe))
 	s.mux.HandleFunc("POST /api/me/password", s.requireAuth(s.handleChangeOwnPassword))
@@ -155,4 +173,28 @@ func userFromContext(r *http.Request) string {
 		return u
 	}
 	return ""
+}
+
+// clientIP returns the request's remote address without its port, for
+// use as a rate-limiter key. It does not consult X-Forwarded-For --
+// ztpanel is meant to sit directly behind a TLS-terminating reverse
+// proxy the deployer controls, not to trust a client-supplied header.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// rateLimited wraps a handler so it returns 429 once its limiter's
+// per-IP quota is exhausted, instead of running the handler at all.
+func rateLimited(limiter *ratelimit.Limiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow(clientIP(r)) {
+			writeError(w, http.StatusTooManyRequests, "too many attempts, try again later")
+			return
+		}
+		next(w, r)
+	}
 }
