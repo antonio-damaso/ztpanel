@@ -130,6 +130,21 @@ docker run -d \
 controller at `127.0.0.1:9993`; alternatively set `ZTPANEL_ZT_URL` to
 wherever the controller is actually reachable from the container.
 
+### Prebuilt binary
+
+Each [release](https://github.com/antonio-damaso/ztpanel/releases/latest)
+ships a single, statically-linked `ztpanel-linux-amd64` binary (the
+Vue frontend is embedded in it) alongside the `Dockerfile`:
+
+```sh
+curl -LO https://github.com/antonio-damaso/ztpanel/releases/latest/download/ztpanel-linux-amd64
+chmod +x ztpanel-linux-amd64
+
+ZTPANEL_ZT_AUTHTOKEN=/var/lib/zerotier-one/authtoken.secret \
+ZTPANEL_DATA_DIR=./data \
+./ztpanel-linux-amd64
+```
+
 ### From source
 
 ```sh
