@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useSetupStore } from '../stores/setup'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/setup', name: 'setup', component: () => import('../views/SetupView.vue'), meta: { public: true } },
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
     { path: '/', name: 'networks', component: () => import('../views/NetworksView.vue') },
     { path: '/networks/:id', name: 'network-detail', component: () => import('../views/NetworkDetailView.vue'), props: true },
@@ -16,6 +18,17 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  const setup = useSetupStore()
+  if (!setup.checked) {
+    await setup.check()
+  }
+  if (setup.needed && to.name !== 'setup') {
+    return { name: 'setup' }
+  }
+  if (!setup.needed && to.name === 'setup') {
+    return { name: 'login' }
+  }
+
   const auth = useAuthStore()
   if (!auth.checked) {
     await auth.checkSession()

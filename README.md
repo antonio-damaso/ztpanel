@@ -48,8 +48,10 @@ alongside a separate Postgres server.
 Early / work in progress. Currently implemented:
 
 - Login, sessions (stateless signed cookies), per-user password change
-- First-run bootstrap: a random admin password is generated and printed
-  once -- there is no hardcoded default password
+- First-run setup page: choose the admin username/password yourself in
+  the browser (and see whether the ZeroTier controller is reachable)
+  instead of digging a generated password out of the container logs --
+  there is no hardcoded default password either way
 - Networks: list, create, rename, delete, private/public toggle, MTU,
   multicast limit
 - Members: list with live online/relay/offline status and latency,
@@ -107,9 +109,10 @@ ZTPANEL_DATA_DIR=./data \
 ./ztpanel
 ```
 
-On first run, ztpanel creates an `admin` user with a random password
-and prints it once to stdout -- save it, you'll be asked to change it
-on first login.
+Open it in a browser. On first run, with no users yet, ztpanel serves
+a setup page instead of the login screen -- pick the admin username
+and password there (the page also shows whether it could reach the
+ZeroTier controller) and you're logged straight in.
 
 ### Configuration (environment variables)
 

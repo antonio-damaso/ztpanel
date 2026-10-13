@@ -40,6 +40,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) routes() {
+	s.mux.HandleFunc("GET /api/setup/status", s.handleSetupStatus)
+	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
+
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
 	s.mux.HandleFunc("POST /api/logout", s.requireAuth(s.handleLogout))
 	s.mux.HandleFunc("GET /api/me", s.requireAuth(s.handleMe))

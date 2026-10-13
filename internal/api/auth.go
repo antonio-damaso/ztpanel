@@ -25,7 +25,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, expires := s.sessions.Issue(user.Name)
+	s.issueSessionCookie(w, user.Name)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"username":           user.Name,
+		"mustChangePassword": user.MustChangePassword,
+	})
+}
+
+// issueSessionCookie is shared by handleLogin and handleSetup -- both
+// end with the caller holding a valid session.
+func (s *Server) issueSessionCookie(w http.ResponseWriter, username string) {
+	token, expires := s.sessions.Issue(username)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
@@ -33,11 +43,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expires,
-	})
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"username":           user.Name,
-		"mustChangePassword": user.MustChangePassword,
 	})
 }
 

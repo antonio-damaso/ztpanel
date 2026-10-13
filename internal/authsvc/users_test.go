@@ -129,20 +129,3 @@ func TestUserStoreCount(t *testing.T) {
 		t.Fatalf("Count = %d, want 1", count)
 	}
 }
-
-func TestGenerateRandomPassword(t *testing.T) {
-	a, err := GenerateRandomPassword()
-	if err != nil {
-		t.Fatalf("GenerateRandomPassword: %v", err)
-	}
-	b, err := GenerateRandomPassword()
-	if err != nil {
-		t.Fatalf("GenerateRandomPassword: %v", err)
-	}
-	if a == b {
-		t.Errorf("two calls returned the same password: %q", a)
-	}
-	if len(a) < 15 {
-		t.Errorf("password too short: %q (%d chars)", a, len(a))
-	}
-}

@@ -4,10 +4,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/antonio-damaso/ztpanel/internal/api"
 	"github.com/antonio-damaso/ztpanel/internal/apitoken"
@@ -34,10 +32,6 @@ func main() {
 	users, err := authsvc.NewUserStore(cfg.UsersFile())
 	if err != nil {
 		log.Fatalf("could not open user store: %v", err)
-	}
-
-	if err := bootstrapFirstAdmin(users); err != nil {
-		log.Fatalf("could not bootstrap first admin user: %v", err)
 	}
 
 	sessions, err := authsvc.NewSessionSigner(cfg.SessionKeyFile())
@@ -72,35 +66,4 @@ func main() {
 	if err := http.ListenAndServe(cfg.ListenAddr, mux); err != nil {
 		log.Fatal(err)
 	}
-}
-
-// bootstrapFirstAdmin creates a single "admin" user with a freshly
-// generated random password the first time ztpanel runs against an
-// empty user store, and prints it once. There is no hardcoded default
-// password anywhere in this codebase.
-func bootstrapFirstAdmin(users *authsvc.UserStore) error {
-	count, err := users.Count()
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-
-	password, err := authsvc.GenerateRandomPassword()
-	if err != nil {
-		return err
-	}
-	if err := users.Create("admin", password, true); err != nil {
-		return err
-	}
-
-	banner := strings.Repeat("=", 60)
-	fmt.Println(banner)
-	fmt.Println("ztpanel: first run detected, created an initial admin account")
-	fmt.Println("  username: admin")
-	fmt.Printf("  password: %s\n", password)
-	fmt.Println("You will be asked to set a new password on first login.")
-	fmt.Println(banner)
-	return nil
 }

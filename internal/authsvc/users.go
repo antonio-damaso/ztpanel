@@ -4,11 +4,8 @@
 package authsvc
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"sync"
 
@@ -173,15 +170,4 @@ func hashPassword(password string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
-}
-
-// GenerateRandomPassword returns a URL-safe random password, used to
-// bootstrap the first admin account so no hardcoded default password
-// ever ships.
-func GenerateRandomPassword() (string, error) {
-	buf := make([]byte, 15)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("generating random password: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
