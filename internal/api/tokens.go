@@ -1,6 +1,11 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+
+	"github.com/antonio-damaso/ztpanel/internal/apitoken"
+)
 
 func (s *Server) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	tokens, err := s.tokens.List(userFromContext(r))
@@ -13,6 +18,13 @@ func (s *Server) handleListTokens(w http.ResponseWriter, r *http.Request) {
 
 type createTokenRequest struct {
 	Name string `json:"name"`
+	// ReadOnly, if true, restricts the token to list/get-style calls
+	// on both the REST API and MCP tools -- no creates, updates or
+	// deletes.
+	ReadOnly bool `json:"readOnly"`
+	// ExpiresInDays, if positive, makes the token stop working after
+	// that many days. Omitted or zero means it never expires.
+	ExpiresInDays int `json:"expiresInDays"`
 }
 
 func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
@@ -21,8 +33,19 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "a name for the token is required")
 		return
 	}
+	if req.ExpiresInDays < 0 {
+		writeError(w, http.StatusBadRequest, "expiresInDays cannot be negative")
+		return
+	}
+
+	opts := apitoken.CreateOptions{ReadOnly: req.ReadOnly}
+	if req.ExpiresInDays > 0 {
+		expiresAt := time.Now().AddDate(0, 0, req.ExpiresInDays)
+		opts.ExpiresAt = &expiresAt
+	}
+
 	username := userFromContext(r)
-	plaintext, token, err := s.tokens.Create(username, req.Name)
+	plaintext, token, err := s.tokens.Create(username, req.Name, opts)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not create token")
 		return
@@ -31,6 +54,8 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":        token.ID,
 		"name":      token.Name,
+		"readOnly":  token.ReadOnly,
+		"expiresAt": token.ExpiresAt,
 		"createdAt": token.CreatedAt,
 		// token is only ever returned here, at creation time.
 		"token": plaintext,

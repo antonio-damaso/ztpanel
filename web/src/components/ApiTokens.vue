@@ -8,13 +8,18 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
+import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
+import Tag from 'primevue/tag'
 
 interface ApiToken {
   id: string
   name: string
   last4: string
+  readOnly: boolean
   createdAt: string
+  expiresAt?: string
   lastUsedAt?: string
 }
 
@@ -26,6 +31,8 @@ const loading = ref(true)
 
 const createOpen = ref(false)
 const newName = ref('')
+const newReadOnly = ref(false)
+const newExpiresInDays = ref<number | null>(null)
 const creating = ref(false)
 
 const createdOpen = ref(false)
@@ -48,9 +55,15 @@ async function createToken() {
   if (!newName.value) return
   creating.value = true
   try {
-    const { data } = await api.post('/tokens', { name: newName.value })
+    const { data } = await api.post('/tokens', {
+      name: newName.value,
+      readOnly: newReadOnly.value,
+      expiresInDays: newExpiresInDays.value ?? 0,
+    })
     createOpen.value = false
     newName.value = ''
+    newReadOnly.value = false
+    newExpiresInDays.value = null
     createdToken.value = data.token
     createdOpen.value = true
     await load()
@@ -116,6 +129,14 @@ function formatDate(iso?: string) {
       <Column header="Token">
         <template #body="{ data }"><span class="zp-mono">ztpanel_...{{ data.last4 }}</span></template>
       </Column>
+      <Column header="Scope">
+        <template #body="{ data }">
+          <Tag :value="data.readOnly ? 'Read-only' : 'Read/write'" :severity="data.readOnly ? 'info' : 'secondary'" />
+        </template>
+      </Column>
+      <Column header="Expires">
+        <template #body="{ data }">{{ data.expiresAt ? formatDate(data.expiresAt) : 'Never' }}</template>
+      </Column>
       <Column header="Created">
         <template #body="{ data }">{{ formatDate(data.createdAt) }}</template>
       </Column>
@@ -133,6 +154,16 @@ function formatDate(iso?: string) {
       <div class="zp-field">
         <label for="newTokenName">Name</label>
         <InputText id="newTokenName" v-model="newName" fluid autofocus placeholder="e.g. Claude Desktop" @keyup.enter="createToken" />
+      </div>
+      <div class="zp-field">
+        <label for="newTokenExpiry">Expires in (days)</label>
+        <InputNumber id="newTokenExpiry" v-model="newExpiresInDays" fluid :min="0" placeholder="Never" />
+      </div>
+      <div class="zp-row" style="gap: 8px; margin-top: 4px">
+        <Checkbox v-model="newReadOnly" input-id="newTokenReadOnly" binary />
+        <label for="newTokenReadOnly" style="cursor: pointer">
+          Read-only (can list/get, but not create, update or delete anything)
+        </label>
       </div>
       <div class="zp-row" style="justify-content: flex-end; margin-top: 10px">
         <Button label="Cancel" severity="secondary" outlined @click="createOpen = false" />

@@ -45,8 +45,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 
 	isNotification := len(msg.ID) == 0 || string(msg.ID) == "null"
 	username := userFromContext(r)
+	readOnly := readOnlyFromContext(r)
 
-	result, rpcErr := s.dispatchMCP(msg.Method, msg.Params, username)
+	result, rpcErr := s.dispatchMCP(msg.Method, msg.Params, username, readOnly)
 
 	if isNotification {
 		// JSON-RPC notifications get no response body at all.
@@ -74,7 +75,7 @@ func writeJSONRPCError(w http.ResponseWriter, status int, id json.RawMessage, co
 	writeJSON(w, status, body)
 }
 
-func (s *Server) dispatchMCP(method string, params json.RawMessage, username string) (any, *jsonrpcError) {
+func (s *Server) dispatchMCP(method string, params json.RawMessage, username string, readOnly bool) (any, *jsonrpcError) {
 	switch method {
 	case "initialize":
 		return map[string]any{
@@ -93,11 +94,21 @@ func (s *Server) dispatchMCP(method string, params json.RawMessage, username str
 		return map[string]any{"tools": mcpTools}, nil
 
 	case "tools/call":
-		return s.handleToolCall(params, username)
+		return s.handleToolCall(params, username, readOnly)
 
 	default:
 		return nil, &jsonrpcError{Code: -32601, Message: "method not found: " + method}
 	}
+}
+
+// mcpMutatingTools are the tools a read-only API token may not call.
+// Everything else here (list_*, get_*) only reads data.
+var mcpMutatingTools = map[string]bool{
+	"create_network": true,
+	"update_network": true,
+	"delete_network": true,
+	"update_member":  true,
+	"delete_member":  true,
 }
 
 type toolCallParams struct {
@@ -105,7 +116,7 @@ type toolCallParams struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
-func (s *Server) handleToolCall(params json.RawMessage, username string) (any, *jsonrpcError) {
+func (s *Server) handleToolCall(params json.RawMessage, username string, readOnly bool) (any, *jsonrpcError) {
 	var p toolCallParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, &jsonrpcError{Code: -32602, Message: "invalid params"}
@@ -114,6 +125,12 @@ func (s *Server) handleToolCall(params json.RawMessage, username string) (any, *
 	tool, ok := mcpToolHandlers[p.Name]
 	if !ok {
 		return nil, &jsonrpcError{Code: -32602, Message: "unknown tool: " + p.Name}
+	}
+	if readOnly && mcpMutatingTools[p.Name] {
+		return map[string]any{
+			"content": []map[string]any{{"type": "text", "text": "this API token is read-only and cannot call " + p.Name}},
+			"isError": true,
+		}, nil
 	}
 	if p.Arguments == nil {
 		p.Arguments = map[string]any{}

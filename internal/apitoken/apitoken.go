@@ -20,6 +20,7 @@ import (
 var (
 	ErrNotFound = errors.New("token not found")
 	ErrInvalid  = errors.New("invalid token")
+	ErrExpired  = errors.New("token expired")
 )
 
 // tokenPrefix makes a ztpanel token recognizable at a glance (in logs,
@@ -33,9 +34,21 @@ type Token struct {
 	Hash     string `json:"hash"`
 	// Last4 is the token's last 4 characters, kept only so a listing
 	// can help the user tell two tokens apart without revealing them.
-	Last4      string     `json:"last4"`
+	Last4 string `json:"last4"`
+	// ReadOnly tokens can only call list/get-style REST and MCP
+	// operations -- no network/member creation, updates or deletes.
+	ReadOnly   bool       `json:"readOnly"`
 	CreatedAt  time.Time  `json:"createdAt"`
+	ExpiresAt  *time.Time `json:"expiresAt,omitempty"`
 	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
+}
+
+// CreateOptions configures an optional expiry and a read-only scope
+// for a newly created token. The zero value means "never expires,
+// full read/write scope".
+type CreateOptions struct {
+	ExpiresAt *time.Time
+	ReadOnly  bool
 }
 
 type store struct {
@@ -83,7 +96,7 @@ func (s *Store) save(st store) error {
 // Create mints a new token for username and returns its plaintext
 // value (shown to the caller exactly once) alongside the stored
 // record, which never carries the plaintext.
-func (s *Store) Create(username, name string) (plaintext string, token Token, err error) {
+func (s *Store) Create(username, name string, opts CreateOptions) (plaintext string, token Token, err error) {
 	plaintext, err = generateToken()
 	if err != nil {
 		return "", Token{}, err
@@ -103,7 +116,9 @@ func (s *Store) Create(username, name string) (plaintext string, token Token, er
 		Username:  username,
 		Hash:      hash,
 		Last4:     plaintext[len(plaintext)-4:],
+		ReadOnly:  opts.ReadOnly,
 		CreatedAt: time.Now(),
+		ExpiresAt: opts.ExpiresAt,
 	}
 	st.Tokens[hash] = rec
 	if err := s.save(st); err != nil {
@@ -153,10 +168,11 @@ func (s *Store) Revoke(id, username string) error {
 }
 
 // Authenticate verifies a presented token and, on success, returns
-// the username it was issued to and records the hit as its last use.
-func (s *Store) Authenticate(plaintext string) (string, error) {
+// the username it was issued to and whether it is read-only, and
+// records the hit as its last use.
+func (s *Store) Authenticate(plaintext string) (username string, readOnly bool, err error) {
 	if !strings.HasPrefix(plaintext, tokenPrefix) {
-		return "", ErrInvalid
+		return "", false, ErrInvalid
 	}
 	hash := hashToken(plaintext)
 
@@ -164,18 +180,21 @@ func (s *Store) Authenticate(plaintext string) (string, error) {
 	defer s.mu.Unlock()
 	st, err := s.load()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	t, ok := st.Tokens[hash]
 	if !ok {
-		return "", ErrInvalid
+		return "", false, ErrInvalid
 	}
 	now := time.Now()
+	if t.ExpiresAt != nil && now.After(*t.ExpiresAt) {
+		return "", false, ErrExpired
+	}
 	t.LastUsedAt = &now
 	if err := s.save(st); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return t.Username, nil
+	return t.Username, t.ReadOnly, nil
 }
 
 func generateToken() (string, error) {

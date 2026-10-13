@@ -123,6 +123,38 @@ func toolCallResultText(t *testing.T, out map[string]any) (string, bool) {
 	return text, isErr
 }
 
+func TestMCPReadOnlyTokenCannotCallMutatingTools(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loginAs(t, "alice", "alice-password1")
+
+	var created map[string]any
+	resp := doJSON(t, c, "POST", env.url("/api/tokens"), map[string]any{"name": "readonly mcp", "readOnly": true})
+	decodeBody(t, resp, &created)
+	token, _ := created["token"].(string)
+	if token == "" {
+		t.Fatalf("could not mint a read-only token: %+v", created)
+	}
+
+	// Reading is still allowed.
+	listOut := mcpCall(t, env, token, 1, "tools/call", map[string]any{"name": "list_networks"})
+	if _, isErr := toolCallResultText(t, listOut); isErr {
+		t.Fatalf("list_networks with a read-only token returned an error: %+v", listOut)
+	}
+
+	// Mutating is not.
+	createOut := mcpCall(t, env, token, 2, "tools/call", map[string]any{
+		"name":      "create_network",
+		"arguments": map[string]any{"name": "office"},
+	})
+	text, isErr := toolCallResultText(t, createOut)
+	if !isErr {
+		t.Fatalf("create_network with a read-only token: want isError, got %+v", createOut)
+	}
+	if text == "" {
+		t.Error("read-only rejection carried no explanation text")
+	}
+}
+
 func TestMCPCreateAndListNetworks(t *testing.T) {
 	env, token := mcpTokenEnv(t)
 

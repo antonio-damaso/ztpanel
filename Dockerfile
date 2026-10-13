@@ -17,7 +17,7 @@ COPY --from=frontend /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/ztpanel ./cmd/ztpanel
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache ca-certificates wget \
  && addgroup -S ztpanel \
  && adduser -S ztpanel -G ztpanel
 
@@ -34,5 +34,6 @@ WORKDIR /data
 ENV ZTPANEL_LISTEN=:8787 \
     ZTPANEL_DATA_DIR=/data
 EXPOSE 8787
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8787/healthz || exit 1
 
 ENTRYPOINT ["ztpanel"]

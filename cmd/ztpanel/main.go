@@ -60,6 +60,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiServer)
 	mux.Handle("/mcp", apiServer)
+	mux.Handle("/healthz", apiServer)
 	mux.Handle("/", webServer)
 
 	log.Printf("ztpanel listening on %s (controller: %s)", cfg.ListenAddr, cfg.ZTControllerURL)

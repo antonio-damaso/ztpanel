@@ -58,6 +58,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) routes() {
+	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
+
 	s.mux.HandleFunc("GET /api/setup/status", s.handleSetupStatus)
 	s.mux.HandleFunc("POST /api/setup", rateLimited(s.setupLimiter, s.handleSetup))
 
@@ -125,22 +127,35 @@ func decodeJSON(r *http.Request, v any) error {
 
 type contextKey string
 
-const userContextKey contextKey = "user"
+const (
+	userContextKey     contextKey = "user"
+	readOnlyContextKey contextKey = "readOnly"
+)
 
 // requireAuth accepts either the browser's session cookie or a
 // long-lived "Authorization: Bearer <token>" API token (internal/apitoken) --
 // the latter is how scripts, the REST API from the CLI, and the /mcp
 // endpoint authenticate without a browser.
+//
+// A read-only API token may call any REST GET/HEAD route, but is
+// rejected outright on any other method under /api/*. /mcp is always
+// POST, so its own tools are instead gated per tool name in mcp.go.
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if bearer, ok := bearerToken(r); ok {
-			username, err := s.tokens.Authenticate(bearer)
+			username, readOnly, err := s.tokens.Authenticate(bearer)
 			if err != nil {
 				w.Header().Set("WWW-Authenticate", "Bearer")
-				writeError(w, http.StatusUnauthorized, "invalid API token")
+				writeError(w, http.StatusUnauthorized, "invalid or expired API token")
 				return
 			}
-			next(w, r.WithContext(context.WithValue(r.Context(), userContextKey, username)))
+			if readOnly && strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead {
+				writeError(w, http.StatusForbidden, "read-only API token cannot perform this action")
+				return
+			}
+			ctx := context.WithValue(r.Context(), userContextKey, username)
+			ctx = context.WithValue(ctx, readOnlyContextKey, readOnly)
+			next(w, r.WithContext(ctx))
 			return
 		}
 
@@ -155,6 +170,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		ctx := context.WithValue(r.Context(), userContextKey, username)
+		ctx = context.WithValue(ctx, readOnlyContextKey, false)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -173,6 +189,13 @@ func userFromContext(r *http.Request) string {
 		return u
 	}
 	return ""
+}
+
+// readOnlyFromContext reports whether the caller authenticated with a
+// read-only API token. A session-cookie caller is never read-only.
+func readOnlyFromContext(r *http.Request) bool {
+	ro, _ := r.Context().Value(readOnlyContextKey).(bool)
+	return ro
 }
 
 // clientIP returns the request's remote address without its port, for

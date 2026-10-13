@@ -3,6 +3,9 @@ package api
 import (
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/antonio-damaso/ztpanel/internal/apitoken"
 )
 
 func TestTokenLifecycle(t *testing.T) {
@@ -68,6 +71,53 @@ func TestTokenRejectsBogusBearer(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestReadOnlyTokenCanReadButNotWrite(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loginAs(t, "alice", "alice-password1")
+
+	var created map[string]any
+	resp := doJSON(t, c, "POST", env.url("/api/tokens"), map[string]any{"name": "ci bot", "readOnly": true})
+	if resp.StatusCode != http.StatusCreated {
+		resp.Body.Close()
+		t.Fatalf("create token: status %d, want 201", resp.StatusCode)
+	}
+	decodeBody(t, resp, &created)
+	if ro, _ := created["readOnly"].(bool); !ro {
+		t.Fatalf("create response readOnly = %v, want true", created["readOnly"])
+	}
+	plaintext, _ := created["token"].(string)
+
+	readResp := doBearer(t, plaintext, "GET", env.url("/api/networks"), nil)
+	defer readResp.Body.Close()
+	if readResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/networks with a read-only token: status %d, want 200", readResp.StatusCode)
+	}
+
+	writeResp := doBearer(t, plaintext, "POST", env.url("/api/networks"), map[string]any{"name": "nope"})
+	defer writeResp.Body.Close()
+	if writeResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("POST /api/networks with a read-only token: status %d, want 403", writeResp.StatusCode)
+	}
+}
+
+func TestExpiredTokenIsRejectedAt401(t *testing.T) {
+	env := newTestEnv(t)
+	if err := env.users.Create("alice", "alice-password1", false); err != nil {
+		t.Fatalf("Create user: %v", err)
+	}
+	past := time.Now().Add(-time.Hour)
+	plaintext, _, err := env.tokens.Create("alice", "stale", apitoken.CreateOptions{ExpiresAt: &past})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	resp := doBearer(t, plaintext, "GET", env.url("/api/me"), nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status with an expired token = %d, want 401", resp.StatusCode)
 	}
 }
 

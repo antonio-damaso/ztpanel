@@ -83,7 +83,10 @@ Early / work in progress. Currently implemented:
 - Activity log: who did what, when, across networks/members/users/orgs
 - Mobile-first responsive UI (off-canvas sidebar below 768px)
 - API tokens and an MCP endpoint, so an LLM (Claude or otherwise) can
-  manage networks/members directly -- see [MCP / API access](#mcp--api-access)
+  manage networks/members directly -- see [MCP / API access](#mcp--api-access);
+  tokens can be scoped read-only and/or set to expire
+- An unauthenticated `/healthz` liveness check for container
+  orchestration and reverse proxies
 - Automated tests for every backend package and the full API surface
   (`go test ./...`), run against a fake ZeroTier controller
 
@@ -207,6 +210,26 @@ authorization server -- ztpanel isn't one. It works with any MCP
 client that can send a static Bearer header (Claude Code, most
 self-hosted/CLI clients).
 
+### Token scope and expiry
+
+A token can optionally be **read-only** (list/get only -- no creates,
+updates or deletes, on either `/api/*` or `/mcp`) and/or set to
+**expire** after a number of days. Both are chosen when the token is
+created, in **Account -> API tokens**, and can't be changed
+afterwards -- revoke it and create a new one instead. A read-only
+token is the safer default for handing to an LLM that will mostly be
+asked to look things up.
+
+## Health check
+
+`GET /healthz` is an unauthenticated liveness check (`{"status":"ok"}`
+once the process is up) for container orchestration or a reverse
+proxy -- it does not depend on the ZeroTier controller being
+reachable. The Docker image's own `HEALTHCHECK` uses it. Controller
+reachability itself is reported by the authenticated `GET /api/status`
+(and surfaced in the UI), since there's no useful way to check it
+without a logged-in session.
+
 ## Testing
 
 ```sh
@@ -216,6 +239,12 @@ npm --prefix web run build          # frontend (type-checks + builds)
 
 The `internal/api` tests run the full HTTP server against an in-memory
 fake of the ZeroTier controller, so they don't need a real one running.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more, including why that
+alone isn't enough to catch every kind of bug here.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
