@@ -21,15 +21,26 @@ single-binary deployment with no external database is preferred.
 | Organizations         | No                              | Yes                              | Yes                              |
 | Activity log          | No                              | Yes                              | Yes                              |
 | Auth token editing     | No (documented as missing)     | Yes                              | Yes                              |
-| Default admin password | Hardcoded (with a known bug)  | Set during setup                | Random, generated on first run  |
+| Default admin password | Hardcoded (with a known bug)  | Set during setup                | Chosen on a first-run setup page |
 | Mobile-friendly UI     | No                              | Partial                          | Yes (mobile-first)              |
-| LLM / MCP integration  | No                              | No                                | Yes -- `/mcp` endpoint + Bearer API tokens |
+| REST API for scripts   | No (session-cookie-only internal routes, not a documented API) | Yes -- `/api/v1/*`, custom `x-ztnet-auth` header | Yes -- `/api/*`, `Authorization: Bearer` token |
+| LLM / MCP integration  | No                              | No                                | Yes -- `/mcp` endpoint, same Bearer token as the REST API |
 | Docker image size*     | ~106 MiB (bundles its own `zerotier-one`) | ~251 MiB app + ~90 MiB Postgres + ~6 MiB zerotier sidecar | ~12 MiB binary, no extra containers |
 | Idle memory (RAM)*     | ~85 MiB (whole container)       | not benchmarked here             | ~10 MiB RSS, single process     |
 
 ztnet has the most mature feature set and a larger community; ztpanel
 trades some of that maturity for a lighter deployment footprint (no
 external database) and a from-scratch, less cluttered UI.
+
+Neither ztncui's nor ztnet's READMEs document an API, so the "REST
+API for scripts" row was checked by reading their source instead:
+ztncui's `/network/*` routes (`src/routes/zt_controller.js`) are
+internal AJAX endpoints for its own Pug views, guarded by
+`req.session.user` only (`src/controllers/auth.js`) -- there's no
+token path in. ztnet does have a real one, versioned and tested
+(`src/pages/api/v1/**`), authenticated via a custom `x-ztnet-auth`
+header (`src/utils/apiRouteAuth.ts`) and covering networks, members,
+organizations, users and stats.
 
 \* Docker image sizes are the published compressed sizes from Docker
 Hub (`keynetworks/ztncui:latest`, `sinamics/ztnet:latest`,
@@ -134,9 +145,25 @@ action.
 Authentication is a long-lived Bearer API token, not OAuth: ztpanel is
 a single, self-hosted binary with no authorization-server
 infrastructure of its own, so a static token -- generated once in
-**Account -> API tokens** -- is the simpler fit. The REST API under
-`/api/*` accepts the same token (as `Authorization: Bearer <token>`),
-so it also works for plain scripts, not just MCP clients.
+**Account -> API tokens** -- is the simpler fit.
+
+There is only one kind of token, and it authenticates both paths: the
+`/api/*` REST API used by the SPA and by scripts, and the `/mcp`
+endpoint used by MCP clients. The same `Authorization: Bearer <token>`
+header works on either one -- it's two protocols over one
+credential, not two separate auth systems:
+
+```sh
+# Plain REST, e.g. from a script -- no MCP involved.
+curl https://your-ztpanel-host/api/networks \
+  -H "Authorization: Bearer ztpanel_xxxxx"
+
+# Same token, MCP's JSON-RPC envelope instead of REST.
+curl -X POST https://your-ztpanel-host/mcp \
+  -H "Authorization: Bearer ztpanel_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_networks"}}'
+```
 
 With [Claude Code](https://claude.com/claude-code):
 
